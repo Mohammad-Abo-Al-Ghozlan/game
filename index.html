@@ -46,6 +46,7 @@
             background-color: #3498db;
             clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
             z-index: 10;
+            touch-action: none;
         }
         
         .bullet {
@@ -159,17 +160,16 @@
         let bullets = [];
         let gameInterval;
         let asteroidInterval;
-        let isDragging = false;
-        let touchStartX = 0;
         
         // Start game
         startBtn.addEventListener('click', startGame);
         document.addEventListener('keydown', handleKeyPress);
         
         // Mobile controls
-        gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-        gameContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-        gameContainer.addEventListener('touchend', handleTouchEnd);
+        spaceship.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd);
+        gameContainer.addEventListener('click', handleShoot);
         
         function startGame() {
             startScreen.style.display = 'none';
@@ -183,6 +183,10 @@
             bullets.forEach(bullet => bullet.remove());
             asteroids = [];
             bullets = [];
+            
+            // Reset spaceship position
+            spaceship.style.left = '50%';
+            spaceship.style.transform = 'translateX(-50%)';
             
             // Start game loop
             gameInterval = setInterval(updateGame, 20);
@@ -205,40 +209,41 @@
         
         function handleTouchStart(e) {
             e.preventDefault();
+        }
+        
+        function handleTouchMove(e) {
+            if (isGameOver) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const containerRect = gameContainer.getBoundingClientRect();
+            const touchX = touch.clientX - containerRect.left;
+            
+            // Calculate new position (keep within bounds)
+            const spaceshipWidth = spaceship.offsetWidth;
+            const maxLeft = containerRect.width - spaceshipWidth;
+            let newLeft = touchX - spaceshipWidth/2;
+            
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            
+            spaceship.style.left = `${newLeft}px`;
+            spaceship.style.transform = 'none';
+        }
+        
+        function handleTouchEnd() {
+            // Optional: add any touch end logic if needed
+        }
+        
+        function handleShoot(e) {
             if (isGameOver) {
                 resetGame();
                 return;
             }
             
-            if (startScreen.style.display !== 'none') {
-                startGame();
-                return;
-            }
-            
-            touchStartX = e.touches[0].clientX;
-            const touchY = e.touches[0].clientY;
-            
-            // If touch is in bottom 30% of screen, treat as shoot
-            if (touchY > gameContainer.offsetHeight * 0.7) {
+            // Only shoot if game is running and not clicking on UI elements
+            if (startScreen.style.display === 'none') {
                 shootBullet();
-            } else {
-                isDragging = true;
             }
-        }
-        
-        function handleTouchMove(e) {
-            if (!isDragging || isGameOver) return;
-            e.preventDefault();
-            
-            const touchX = e.touches[0].clientX;
-            const movementX = touchX - touchStartX;
-            touchStartX = touchX;
-            
-            moveSpaceship(movementX);
-        }
-        
-        function handleTouchEnd() {
-            isDragging = false;
         }
         
         function moveSpaceship(amount) {
@@ -251,10 +256,7 @@
             // Prevent moving outside the container
             if (newLeft >= 0 && newLeft <= maxLeft) {
                 spaceship.style.left = `${newLeft}px`;
-            } else if (newLeft < 0) {
-                spaceship.style.left = '0px';
-            } else {
-                spaceship.style.left = `${maxLeft}px`;
+                spaceship.style.transform = 'none';
             }
         }
         
@@ -266,7 +268,7 @@
             const spaceshipRect = spaceship.getBoundingClientRect();
             const containerRect = gameContainer.getBoundingClientRect();
             
-            bullet.style.left = `${spaceshipRect.left - containerRect.left + spaceship.offsetWidth/2 - bullet.offsetWidth/2}px`;
+            bullet.style.left = `${spaceshipRect.left - containerRect.left + spaceship.offsetWidth/2 - 2}px`;
             bullet.style.bottom = `${spaceshipRect.bottom - containerRect.top + 5}px`;
             gameContainer.appendChild(bullet);
             bullets.push(bullet);
